@@ -1,8 +1,6 @@
 /* EDUVIA — Service Worker (تطبيق وليّ الأمر · نشر مستقل) */
-const CACHE = "eduvia-parent-v1";
+const CACHE = "eduvia-parent-v2";
 const ASSETS = [
-  "./",
-  "./index.html",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -23,6 +21,19 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
+  const accept = e.request.headers.get("accept") || "";
+  const isDoc = e.request.mode === "navigate" || accept.includes("text/html");
+  if (isDoc) {
+    // network-first: اجلب أحدث نسخة، وارجع للكاش عند انقطاع الشبكة
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return res;
+      }).catch(() => caches.match(e.request).then(r => r || caches.match("./index.html")))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(cached =>
       cached || fetch(e.request).then(res => {
